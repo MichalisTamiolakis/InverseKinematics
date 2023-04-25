@@ -135,66 +135,49 @@ namespace MAGES.IK
             if (m_IK.joints.Count < 2)
                 return;
 
-
-            // Draw joints
-            using (new Handles.DrawingScope(Color.green))
-            {
-                foreach (MAGESIK.Joint j in m_IK.joints)
-                {
-                    if (j.joint)
-                        continue;
-                    Handles.DrawWireCube(j.joint.position, Vector3.one * .05f);
-                }
-            }
-
-            // Draw links
-            using (new Handles.DrawingScope(Color.blue))
-            {
-                for (int i = 0; i < m_IK.joints.Count - 1; i++)
-                {
-                    if(!m_IK.joints[i].joint || m_IK.joints[i + 1].joint)
-                        Handles.DrawLine(m_IK.joints[i].newCandidatePosition, m_IK.joints[i + 1].newCandidatePosition);
-                }
-            }
-
-
             // Draw Constraints for each link and axis
             for (int i = 0; i < m_IK.joints.Count - 1; i++)
             {
-                MAGESIK.Joint joint = m_IK.joints[i];
+                IKJoint joint = m_IK.joints[i];
 
-                if (!joint.joint || !joint.constraint)
+                if (!joint)
                     continue;
+
+                //if (!joint.joint || !joint.constraint)
+                //    continue;
 
                 if (i == 0)
                 {
                     Matrix4x4 handleMatrix = Matrix4x4.TRS(
-                                joint.newCandidatePosition,
-                                Quaternion.FromToRotation(Vector3.right, joint.constraint.axis),
+                                joint.Position,
+                                joint.Rotation,
                                 Vector3.one
                             );
 
-                    joint.constraint.DrawHandles(handleMatrix);
 
-                    Matrix4x4 axisMatrix = Matrix4x4.TRS(joint.newCandidatePosition, Quaternion.identity, Vector3.one * .2f);
+                    joint.DrawHandles(handleMatrix);
 
-                    DrawAxis(axisMatrix);
+                    //Matrix4x4 axisMatrix = Matrix4x4.TRS(joint.newCandidatePosition, Quaternion.identity, Vector3.one * .2f);
+
+                    //DrawAxis(axisMatrix);
                 }
                 else
                 {
-                    MAGESIK.Link linkToParent = m_IK.links[i - 1];
+                    //MAGESIK.Link linkToParent = m_IK.links[i - 1];
+
+                    Vector3 linkToParentDirection = m_IK.joints[i].Position - m_IK.joints[i - 1].Position;
 
                     Matrix4x4 handleMatrix = Matrix4x4.TRS(
-                                joint.newCandidatePosition,
-                                Quaternion.FromToRotation(Vector3.up, linkToParent.newCandidateDirection) * Quaternion.FromToRotation(Vector3.right, joint.constraint.axis),
+                                joint.Position,
+                                Quaternion.FromToRotation(Vector3.up, linkToParentDirection),
                                 Vector3.one
                             );
 
-                    joint.constraint.DrawHandles(handleMatrix);
+                    joint.DrawHandles(handleMatrix);
 
-                    Matrix4x4 axisMatrix = Matrix4x4.TRS(joint.newCandidatePosition, Quaternion.FromToRotation(Vector3.up, linkToParent.direction), Vector3.one * .2f);
+                    //Matrix4x4 axisMatrix = Matrix4x4.TRS(joint.newCandidatePosition, Quaternion.FromToRotation(Vector3.up, linkToParent.direction), Vector3.one * .2f);
 
-                    DrawAxis(axisMatrix);
+                    //DrawAxis(axisMatrix);
 
                 }
             }
