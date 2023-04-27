@@ -148,11 +148,9 @@ namespace MAGES.IK
 
                 if (i == 0)
                 {
-                    Matrix4x4 handleMatrix = Matrix4x4.TRS(
-                                joint.Position,
-                                joint.Rotation,
-                                Vector3.one
-                            );
+                    Matrix4x4 handleMatrix = Matrix4x4.Translate(
+                        joint.Position
+                        );
 
 
                     joint.DrawHandles(handleMatrix);
