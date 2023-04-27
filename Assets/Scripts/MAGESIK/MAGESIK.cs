@@ -76,22 +76,30 @@ namespace MAGES.IK
 
         private bool m_IsInitialized = false;
 
+        // Used to check for target transform changes in order to not update IK every frame
+        Vector3 previousTargetPosition = Vector3.zero;
+        Quaternion previousTargetRotation = Quaternion.identity;
+
         private void Awake()
         {
             Initialize();
         }
 
-        private void Update()
+        private void Start()
         {
-            if(target && target.transform.hasChanged)
-            {
-                SolveIK();
-            }
+            SolveIK(); // Solve once on start even if target has not moved
+            HasTargetTransformChanged(); // To store initial values for previous Position and Rotation
         }
 
         void LateUpdate()
         {
-            target.transform.hasChanged = false;
+            // Check here for transform changes to detect changes
+            // from animations too
+            if (target && HasTargetTransformChanged())
+            {
+                print("Update");
+                SolveIK();
+            }
         }
 
         private void Initialize()
@@ -320,6 +328,18 @@ namespace MAGES.IK
         private bool IsTargetInReach()
         {
             return Vector3.SqrMagnitude(TargetPosition - joints[0].virtualPosition) < m_TotalLinksLength * m_TotalLinksLength;
+        }
+
+        /// <summary>
+        /// Detects if target transform (only position or rotation) has changed
+        /// </summary>
+        /// <returns>True if the transform has changed since the last time this function was called, false otherwise</returns>
+        private bool HasTargetTransformChanged()
+        {
+            bool changed =  previousTargetPosition != TargetPosition || previousTargetRotation != TargetRotation;
+            previousTargetPosition = TargetPosition;
+            previousTargetRotation = TargetRotation;
+            return changed;
         }
 
         #endregion
