@@ -66,7 +66,7 @@ namespace MAGES.IK
         /// </summary>
         /// <param name="referenceTransform">The transform on which all the contraints will be referenced on</param>
         /// <param name="direction">The in unconstrained direction</param>
-        /// <param name="constrainedDirection">The constrained direction based on joint type</param>
+        /// <returns>The constrained direction based on joint type</returns>
         public virtual void SolveDirectionConstraint(in Matrix4x4 referenceTransform, in Vector3 direction, out Vector3 constrainedDirection)
         {
             constrainedDirection = direction; // No constraints for free move joint

@@ -9,10 +9,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 using UnityEngine.UIElements;
+
 
 namespace MAGES.IK
 {
@@ -53,7 +55,7 @@ namespace MAGES.IK
         }
 
         public Transform target = null;
-        public int iterations = 10;
+        public int iterations = 8;
         public float errorTolerance = .01f;
 
 
@@ -79,13 +81,17 @@ namespace MAGES.IK
             Initialize();
         }
 
-        void LateUpdate()
+        private void Update()
         {
-            if (Application.isPlaying && target.transform.hasChanged)
+            if(target && target.transform.hasChanged)
             {
                 SolveIK();
-                target.transform.hasChanged = false;
             }
+        }
+
+        void LateUpdate()
+        {
+            target.transform.hasChanged = false;
         }
 
         private void Initialize()
@@ -125,7 +131,7 @@ namespace MAGES.IK
 
         }
 
-
+        [ContextMenu("Solve IK")]
         public void SolveIK()
         {
             // Target check
@@ -137,7 +143,16 @@ namespace MAGES.IK
                 return;
 
             PreSolve();
-            Solve();
+            for(int iter=0; iter < iterations; iter++)
+            {
+                // Is target close enough?
+                if (IsTargetWithinToleranceLimit())
+                    break;
+
+                // Solve Forward and Backward Iterations
+                SolveForward();
+                SolveBackward();
+            }
             PostSolve();
         }
         
@@ -157,149 +172,112 @@ namespace MAGES.IK
             }
         }
 
-        private void Solve()
+        private void SolveForward()
         {
-            for (int iter = 0; iter < iterations; iter++)
+            
+            // Leaf to Root
+            // In this step we constraint the parent joint position based on the current joint's position
+            joints[joints.Count - 1].virtualPosition = TargetPosition;
+            for (int i = joints.Count - 1; i > 0; i--)
             {
-                #region forward iteration
+                // Root ... ----| previousLink |----> (parentJoint) ----| currentLink |---->  (currentJoint) ----| ... | ---->  ... Leaf
+                IKJoint currentJoint = joints[i];
+                IKJoint parentJoint = joints[i - 1];
+                Link currentLink = links[i - 1];
 
-
-                // Leaf to Root
-                // In this step we constraint the parent joint position based on the current joint's position
-                joints[joints.Count - 1].virtualPosition = TargetPosition;
-                for (int i = joints.Count - 1; i > 0; i--)
+                // Intermediate joint
+                if (i > 1)
                 {
-                    // (...) ----| previousLink |----> (parentJoint) ----| currentLink |---->  (currentJoint) ----| ... | ---->  
-                    IKJoint currentJoint = joints[i];
-                    IKJoint parentJoint = joints[i - 1];
-                    Link currentLink = links[i - 1];
+                    Link previousLink = links[i - 2];
 
-                    // Intermediate joint
-                    if (i > 1)
-                    {
-                        Link previousLink = links[i - 2];
+                    Vector3 direction = currentJoint.virtualPosition - parentJoint.virtualPosition;
 
-                        Vector3 direction = currentJoint.virtualPosition - parentJoint.virtualPosition;
+                    // Constraint direction based on parent joint constraint
+                    parentJoint.SolveDirectionConstraint(previousLink.RotationMatrix, direction, out direction);
 
-                        // Constraint direction based on parent joint constraint
-                        parentJoint.SolveDirectionConstraint(previousLink.RotationMatrix, in direction, out direction);
+                    direction = Vector3.Normalize(direction);
 
-                        direction = Vector3.Normalize(direction);
-                        currentLink.direction = direction;
-
-
-                        // Place parent joint the constrained distance away in the direction
-                        parentJoint.virtualPosition = currentJoint.virtualPosition - direction * currentLink.length;
-
-                    }
-
-                    // Joint connected to root
-                    else
-                    {
-                        Vector3 direction = currentJoint.virtualPosition - parentJoint.virtualPosition;
-
-                        Matrix4x4 transformMatrix = Matrix4x4.Rotate(Quaternion.FromToRotation(Vector3.up, currentLink.initialDirection));
-                        parentJoint.SolveDirectionConstraint(transformMatrix, in direction, out direction);
-
-                        direction = Vector3.Normalize(direction);
-
-                        currentLink.direction = direction;
-
-
-                        // Place parent joint the constrained distance away in the direction
-                        parentJoint.virtualPosition = currentJoint.virtualPosition - direction * currentLink.length;
-
-                    }
+                    currentLink.direction = direction;
+                    parentJoint.virtualPosition = currentJoint.virtualPosition - direction * currentLink.length;
 
                 }
-                #endregion
 
-                #region backwards iteration
-                // Root to Leaf
-                // In this step we constraint the child joint position based on the current joint's position
-
-                // Move root node to the initial position
-                joints[0].virtualPosition = joints[0].initialPosition;
-
-                for (int i = 0; i < joints.Count - 1; i++)
+                // Joint connected to root
+                else
                 {
+                    Vector3 direction = currentJoint.virtualPosition - parentJoint.virtualPosition;
 
-                    // (...) ----| previousLink |----> (currentJoint) ----| currentLink |---->  (childJoint) ----| ... | ---->             
-                    IKJoint currentJoint = joints[i];
-                    IKJoint childJoint = joints[i + 1];
-                    Link currentLink = links[i];
+                    Matrix4x4 transformMatrix = Matrix4x4.Rotate(Quaternion.FromToRotation(Vector3.up, currentLink.initialDirection));
+                    parentJoint.SolveDirectionConstraint(transformMatrix, direction, out direction);
 
-                    // Root joint
-                    if (i == 0)
-                    {
-                        Vector3 direction = childJoint.virtualPosition - currentJoint.virtualPosition;
+                    direction = Vector3.Normalize(direction);
 
-
-                        Matrix4x4 transformMatrix = Matrix4x4.Rotate(Quaternion.FromToRotation(Vector3.up, currentLink.initialDirection));
-                        currentJoint.SolveDirectionConstraint(transformMatrix, in direction, out direction);
-
-                        direction = Vector3.Normalize(direction);
-                        currentLink.direction = direction;
-
-                        // Place child joint the constrained distance away in the direction
-                        childJoint.virtualPosition = currentJoint.virtualPosition + direction * currentLink.length;
-
-                    }
-
-                    // Intermediate joints
-                    else
-                    {
-                        Link previousLink = links[i - 1];
-
-                        Vector3 direction = childJoint.virtualPosition - currentJoint.virtualPosition;
-
-                        currentJoint.SolveDirectionConstraint(previousLink.RotationMatrix, in direction, out direction);
-
-                        direction = Vector3.Normalize(direction);
-                        currentLink.direction = direction;
-
-                        //Debug.DrawLine(currentJoint.newCandidatePosition, currentJoint.newCandidatePosition + direction * 5f, Color.red, 1f);
-                        // Place parent joint the constrained distance away in the direction
-                        childJoint.virtualPosition = currentJoint.virtualPosition + direction * currentLink.length;
-                    }
+                    currentLink.direction = direction;
+                    parentJoint.virtualPosition = currentJoint.virtualPosition - direction * currentLink.length;
 
                 }
-                #endregion
 
-                // The target is close enough do not do other iterations
-                if ((joints[joints.Count - 1].virtualPosition - target.position).sqrMagnitude < errorTolerance * errorTolerance)
+            }
+        }
+
+        private void SolveBackward()
+        {
+            // Root to Leaf
+            // In this step we constraint the child joint position based on the current joint's position
+
+            joints[0].virtualPosition = joints[0].initialPosition; // Move root joint to initial position
+            for(int i=1; i< joints.Count; i++)
+            {
+                IKJoint currentJoint = joints[i];
+                IKJoint parentJoint = joints[i - 1];
+                Link currentLink = links[i-1]; // Between parent and current
+
+                // Parent joint is root?
+                if (i == 1)
                 {
-                    break;
+                    Vector3 direction = currentJoint.virtualPosition - parentJoint.virtualPosition;
+
+                    Matrix4x4 transformMatrix = Matrix4x4.identity;
+                    parentJoint.SolveDirectionConstraint(transformMatrix, direction, out direction);
+                    direction = Vector3.Normalize(direction);
+                    
+                    currentLink.direction = direction;
+                    currentJoint.virtualPosition = parentJoint.virtualPosition + direction * currentLink.length;
+                }
+                else
+                {
+                    Link parentLink = links[i - 2];
+
+                    Vector3 direction = currentJoint.virtualPosition - parentJoint.virtualPosition;
+
+                    Matrix4x4 transformMatrix = parentLink.RotationMatrix;
+                    parentJoint.SolveDirectionConstraint(transformMatrix, direction, out direction);
+                    direction = Vector3.Normalize(direction);
+                    
+                    currentLink.direction = direction;
+                    currentJoint.virtualPosition = parentJoint.virtualPosition + direction * currentLink.length;
                 }
             }
         }
+
 
         private void PostSolve()
         {
-            // Apply all virtual values to the real objects in the order from root to leaf
-            //Calculate Rotations
-            for (int i = 0; i < joints.Count - 1; i++)
+            //Apply all virtual values to the real objects in the order from root to leaf
+            for (int i = 0; i < joints.Count-1; i++)
             {
-                joints[i].virtualRotation = Quaternion.FromToRotation(Vector3.up, links[i].direction) * joints[i].initialRotation;
+                joints[i].virtualRotation = Quaternion.FromToRotation(links[i].initialDirection, links[i].direction) * joints[i].initialRotation;
                 joints[i].Rotation = joints[i].virtualRotation;
-
-                joints[i].Position = joints[i].virtualPosition;
             }
             joints[joints.Count - 1].Rotation = target.rotation * Quaternion.Inverse(m_InitialTargetRotation) * joints[joints.Count - 1].initialRotation;
-
-
-            //// Apply new candidate positions and rotations back to transforms
-            //foreach (Joint j in joints)
-            //{
-            //    j.position = j.newCandidatePosition;
-            //    j.joint.rotation = j.newCandidateRotation;
-            //}
-
-            //for (int i = 0; i < joints.Count - 1; i++)
-            //{
-            //    links[i].direction = joints[i + 1].joint.position - joints[i].joint.position;
-            //}
+                
+            // Apply virtual positions to the joints
+            for(int i=0; i<joints.Count; i++)
+            {
+                joints[i].Position = joints[i].virtualPosition;
+            }
         }
+
 
         private void OnDrawGizmos()
         {
@@ -323,6 +301,16 @@ namespace MAGES.IK
         }
 
         #region Helper Functions
+
+
+        /// <summary>
+        /// Checks if the target is closer than the tolerance distance
+        /// </summary>
+        /// <returns>True if target is closer than tolerance distance, false otherwise</returns>
+        private bool IsTargetWithinToleranceLimit()
+        {
+            return (joints[joints.Count - 1].virtualPosition - target.position).sqrMagnitude < errorTolerance * errorTolerance;
+        }
 
         /// <summary>
         /// Checks if a target is in reach of the IK joints, if the joints do not have any limit.
