@@ -8,6 +8,9 @@ namespace MAGES.IK
     [AddComponentMenu("MAGES/IK/Unconstrained Joint")]
     public class IKJoint : MonoBehaviour
     {
+        public MAGESIK solver;
+
+
         // ---- These variables are set by the MAGESIK script on which thris joint isattached to ----
         // Length from this to next joint transform
         public Quaternion initialRotation;
@@ -30,13 +33,29 @@ namespace MAGES.IK
         public Quaternion virtualRotation;
         public Quaternion previousRotation;
 
+        public IKJoint ParentJoint
+        {
+
+            get{
+                if (!solver)
+                    return null;
+
+                int index = solver.Joints.IndexOf(this);
+                if (index > 0)
+                {
+                    return solver.Joints[index - 1];
+                }
+                return null;
+            }
+        }
+
         /// <summary>
         /// Applies virtual position to the Transform of this joint
         /// </summary>
         public void ApplyVirtualPosition()
-        {
-            this.transform.position = this.virtualPosition;
-        }
+            {
+                this.transform.position = this.virtualPosition;
+            }
 
         /// <summary>
         /// Applies virtual rotation to the Transform of this joint
@@ -45,20 +64,6 @@ namespace MAGES.IK
         {
             this.transform.rotation = this.virtualRotation;
         }
-
-        //// Based on Up vector
-        //public Vector3 Direction
-        //{
-        //    get
-        //    {
-        //        return Quaternion.FromToRotation(Vector3.up, transform.up);
-        //    }
-
-        //    set
-        //    {
-
-        //    }
-        //}
 
 
         /// <summary>
@@ -81,6 +86,37 @@ namespace MAGES.IK
         /// <returns>True if changes to the constraints where made with the handles (Used to update the inspector)</returns>
         public virtual void DrawHandles(Matrix4x4 handleMatrix)
         {
+        }
+
+        /// <summary>
+        /// Draws handles for this constraint based on parent direction
+        /// </summary>
+        public virtual void DrawHandles()
+        {
+            IKJoint parent = ParentJoint;
+
+            if (!ParentJoint)
+            {
+                Matrix4x4 handleMatrix = Matrix4x4.Translate(
+                this.initialPosition
+                );
+
+
+                this.DrawHandles(handleMatrix);
+            }
+            else
+            {
+
+                Vector3 linkToParentDirection = Position - parent.Position;
+
+                Matrix4x4 handleMatrix = Matrix4x4.TRS(
+                            Position,
+                            Quaternion.FromToRotation(Vector3.up, linkToParentDirection),
+                            Vector3.one
+                        );
+
+                DrawHandles(handleMatrix);
+            }
         }
 #endif
     }

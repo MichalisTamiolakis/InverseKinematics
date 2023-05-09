@@ -1,32 +1,41 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEditor.EditorTools;
 using UnityEngine;
 
 namespace MAGES.IK
 {
-    [CustomEditor(typeof(MAGESIK))]
-    public class MAGESIKEditor : Editor
+    [CustomEditor(typeof(IKJoint))]
+    internal class IKJointEditor: Editor
     {
         protected static class Styles
         {
-            public static readonly GUIContent iterations = EditorGUIUtility.TrTextContent("Solver Iterations", "In FABRIK solver how many times should the forward and backwards path be computed?");
-            public static readonly GUIContent errorTolerance = EditorGUIUtility.TrTextContent("Error Tolerance", "The maximum allowable distance from the target in order to stop the remaining iterations");
-
             public static readonly GUIStyle singleButtonStyle = "EditModeSingleButton";
-            public static readonly GUIContent editAngularLimitsButton = EditorGUIUtility.TrIconContent("d_JointAngularLimits", " | Edit Joint Angular Limits");
+            public static readonly GUIContent editJointButton = EditorGUIUtility.TrIconContent("d_JointAngularLimits", " | Edit Joint");
         }
 
         private static int k_ButtonHeight = 23;
         private static int k_ButtonWidth = 35;
         private static int k_SpaceBetweenLabelAndButton = 5;
 
+        protected IKJoint m_Joint;
+
+        public void OnEnable()
+        {
+            m_Joint= (IKJoint)target;
+        }
+
         public override void OnInspectorGUI()
         {
-            MAGESIK ik = (MAGESIK)target;
+           
+            bool isEditToolActive = ToolManager.activeToolType == typeof(IKJointEditTool);
 
-            bool isEditToolActive = ToolManager.activeToolType == typeof(IKConstraintsEditTool);
-
-            if (isEditToolActive != DoEditModeInspectorModeButton("Edit Angular Limits", Styles.editAngularLimitsButton, isEditToolActive))
+            if (isEditToolActive != DoEditModeInspectorModeButton("Edit Joint", Styles.editJointButton, isEditToolActive))
             {
                 // Exiting Edit Mode
                 if (isEditToolActive)
@@ -36,32 +45,15 @@ namespace MAGES.IK
                 // Openning Edit Mode
                 else
                 {
-                    ToolManager.SetActiveTool(typeof(IKConstraintsEditTool));
+                    ToolManager.SetActiveTool(typeof(IKJointEditTool));
                 }
 
                 SceneView.RepaintAll();
             }
 
-
-
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("target"));
-
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("iterations"));
-
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("errorTolerance"));
-
-
-            EditorGUI.BeginChangeCheck();
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("m_Joints"));
-            if (EditorGUI.EndChangeCheck())
-            {
-                ik.InitializeJoints();
-            }
-
-            serializedObject.ApplyModifiedProperties();
-
-
+            base.OnInspectorGUI();
         }
+
 
         protected static bool DoEditModeInspectorModeButton(string label, GUIContent icon, bool value)
         {
@@ -85,33 +77,12 @@ namespace MAGES.IK
 
         }
 
-
-
-        public static void DrawPlaneAtPoint(in Plane plane, in Vector3 center, in float size)
-        {
-            Vector3 centerOnPlane = plane.ClosestPointOnPlane(center);
-            Quaternion basis = Quaternion.LookRotation(plane.normal);
-            Vector3 scale = Vector3.one * size / 10f;
-
-            Vector3 right = Vector3.Scale(basis * Vector3.right, scale);
-            Vector3 up = Vector3.Scale(basis * Vector3.up, scale);
-
-            for (int i = -5; i <= 5; i++)
-            {
-                Handles.DrawLine(centerOnPlane + right * i - up * 5, centerOnPlane + right * i + up * 5);
-                Handles.DrawLine(centerOnPlane + up * i - right * 5, centerOnPlane + up * i + right * 5);
-            }
-
-            Handles.DrawLine(centerOnPlane, centerOnPlane + (size / 10) * plane.normal);
-        }
-
     }
 
-
-    [EditorTool("Angular Limits Edit Tool", typeof(MAGESIK))]
-    public class IKConstraintsEditTool : EditorTool
+    [EditorTool("Edit Joint", typeof(IKJoint))]
+    public class IKJointEditTool : EditorTool
     {
-        private MAGESIK m_IK;
+        private IKJoint m_Joint;
 
         protected static class Styles
         {
@@ -131,21 +102,15 @@ namespace MAGES.IK
 
         private void OnEnable()
         {
-            m_IK = (MAGESIK)target;
+            m_Joint = (IKJoint)target;
+
         }
 
         public override void OnToolGUI(EditorWindow window)
         {
-            m_IK = (MAGESIK)target;
+            m_Joint = (IKJoint)target;
 
-            if (m_IK.Joints.Count < 2)
-                return;
-
-            // Draw Constraints for each link and axis
-            foreach(IKJoint joint in m_IK.Joints)
-            {
-                joint.DrawHandles();
-            }
+            m_Joint.DrawHandles();
         }
 
         private void DrawAxis(Matrix4x4 matrix)
@@ -168,5 +133,4 @@ namespace MAGES.IK
         }
 
     }
-
 }

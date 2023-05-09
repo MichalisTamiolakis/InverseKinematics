@@ -72,7 +72,18 @@ namespace MAGES.IK
         [SerializeField]
         private float m_TotalLinksLength;
         [SerializeField]
-        public List<IKJoint> joints = new List<IKJoint>();
+        private List<IKJoint> m_Joints = new List<IKJoint>();
+
+        public List<IKJoint> Joints
+        {
+            get => m_Joints;
+            set
+            {
+                m_Joints = value;
+                // Initialize joints
+                InitializeJoints();
+            }
+        }
 
         private bool m_IsInitialized = false;
 
@@ -102,10 +113,22 @@ namespace MAGES.IK
             }
         }
 
-        private void Initialize()
+        public void Initialize()
+        {
+            InitializeJoints();
+            InitializeLinks();
+
+            // Store initial target data
+            m_InitialTargetPosition = target.position;
+            m_InitialTargetRotation = target.rotation;
+            m_IsInitialized = true;
+
+        }
+
+        public void InitializeJoints()
         {
             // Initialize Joints
-            foreach(IKJoint joint in joints) 
+            foreach (IKJoint joint in m_Joints)
             {
                 if (joint == null)
                     return;
@@ -118,25 +141,25 @@ namespace MAGES.IK
                 joint.previousRotation = joint.initialRotation;
                 joint.previousPosition = joint.initialPosition;
                 joint.previousSolvedPosition = joint.initialPosition;
+
+                joint.solver = this;
             }
 
+        }
+
+        public void InitializeLinks()
+        {
             // Initialize Links
             links.Clear();
             m_TotalLinksLength = 0f;
-            for(int i=1; i<joints.Count; i++)
+            for (int i = 1; i < m_Joints.Count; i++)
             {
-                float length = (joints[i].virtualPosition - joints[i-1].virtualPosition).magnitude;
-                Vector3 direction = (joints[i].virtualPosition - joints[i-1].virtualPosition).normalized;
+                float length = (m_Joints[i].virtualPosition - m_Joints[i - 1].virtualPosition).magnitude;
+                Vector3 direction = (m_Joints[i].virtualPosition - m_Joints[i - 1].virtualPosition).normalized;
 
                 links.Add(new Link(length, direction));
                 m_TotalLinksLength += length;
             }
-
-            // Store initial target data
-            m_InitialTargetPosition = target.position;
-            m_InitialTargetRotation = target.rotation;
-            m_IsInitialized = true;
-
         }
 
         [ContextMenu("Solve IK")]
@@ -167,7 +190,7 @@ namespace MAGES.IK
         private void PreSolve()
         {
             // Store current positions as previous positions
-            foreach (IKJoint j in joints)
+            foreach (IKJoint j in m_Joints)
             {
                 j.previousPosition = j.virtualPosition;
                 j.previousRotation = j.virtualRotation;
@@ -185,12 +208,12 @@ namespace MAGES.IK
             
             // Leaf to Root
             // In this step we constraint the parent joint position based on the current joint's position
-            joints[joints.Count - 1].virtualPosition = TargetPosition;
-            for (int i = joints.Count - 1; i > 0; i--)
+            m_Joints[m_Joints.Count - 1].virtualPosition = TargetPosition;
+            for (int i = m_Joints.Count - 1; i > 0; i--)
             {
                 // Root ... ----| previousLink |----> (parentJoint) ----| currentLink |---->  (currentJoint) ----| ... | ---->  ... Leaf
-                IKJoint currentJoint = joints[i];
-                IKJoint parentJoint = joints[i - 1];
+                IKJoint currentJoint = m_Joints[i];
+                IKJoint parentJoint = m_Joints[i - 1];
                 Link currentLink = links[i - 1];
 
                 // Intermediate joint
@@ -233,11 +256,11 @@ namespace MAGES.IK
             // Root to Leaf
             // In this step we constraint the child joint position based on the current joint's position
 
-            joints[0].virtualPosition = joints[0].initialPosition; // Move root joint to initial position
-            for(int i=1; i< joints.Count; i++)
+            m_Joints[0].virtualPosition = m_Joints[0].initialPosition; // Move root joint to initial position
+            for(int i=1; i< m_Joints.Count; i++)
             {
-                IKJoint currentJoint = joints[i];
-                IKJoint parentJoint = joints[i - 1];
+                IKJoint currentJoint = m_Joints[i];
+                IKJoint parentJoint = m_Joints[i - 1];
                 Link currentLink = links[i-1]; // Between parent and current
 
                 // Parent joint is root?
@@ -268,21 +291,20 @@ namespace MAGES.IK
             }
         }
 
-
         private void PostSolve()
         {
             //Apply all virtual values to the real objects in the order from root to leaf
-            for (int i = 0; i < joints.Count-1; i++)
+            for (int i = 0; i < m_Joints.Count-1; i++)
             {
-                joints[i].virtualRotation = Quaternion.FromToRotation(links[i].initialDirection, links[i].direction) * joints[i].initialRotation;
-                joints[i].Rotation = joints[i].virtualRotation;
+                m_Joints[i].virtualRotation = Quaternion.FromToRotation(links[i].initialDirection, links[i].direction) * m_Joints[i].initialRotation;
+                m_Joints[i].Rotation = m_Joints[i].virtualRotation;
             }
-            joints[joints.Count - 1].Rotation = target.rotation * Quaternion.Inverse(m_InitialTargetRotation) * joints[joints.Count - 1].initialRotation;
+            m_Joints[m_Joints.Count - 1].Rotation = target.rotation * Quaternion.Inverse(m_InitialTargetRotation) * m_Joints[m_Joints.Count - 1].initialRotation;
                 
             // Apply virtual positions to the joints
-            for(int i=0; i<joints.Count; i++)
+            for(int i=0; i<m_Joints.Count; i++)
             {
-                joints[i].Position = joints[i].virtualPosition;
+                m_Joints[i].Position = m_Joints[i].virtualPosition;
             }
         }
 
@@ -291,18 +313,18 @@ namespace MAGES.IK
         {
             using(new Handles.DrawingScope(Color.blue, Matrix4x4.identity))
             {
-                foreach(IKJoint j in joints)
+                foreach(IKJoint j in m_Joints)
                 {
                     if (!j)
                         continue;
                     Handles.DrawWireCube(j.Position, Vector3.one * 0.3f * HandleUtility.GetHandleSize(j.Position));
                 }
                 
-                for(int i=1; i<joints.Count; i++)
+                for(int i=1; i<m_Joints.Count; i++)
                 {
-                    if (!joints[i - 1] || !joints[i])
+                    if (!m_Joints[i - 1] || !m_Joints[i])
                         continue;
-                    Handles.DrawLine(joints[i-1].Position, joints[i].Position);
+                    Handles.DrawLine(m_Joints[i-1].Position, m_Joints[i].Position);
                 }
             }
 
@@ -317,7 +339,7 @@ namespace MAGES.IK
         /// <returns>True if target is closer than tolerance distance, false otherwise</returns>
         private bool IsTargetWithinToleranceLimit()
         {
-            return (joints[joints.Count - 1].virtualPosition - target.position).sqrMagnitude < errorTolerance * errorTolerance;
+            return (m_Joints[m_Joints.Count - 1].virtualPosition - target.position).sqrMagnitude < errorTolerance * errorTolerance;
         }
 
         /// <summary>
@@ -327,7 +349,7 @@ namespace MAGES.IK
         /// <returns>Is the target in reach?</returns>
         private bool IsTargetInReach()
         {
-            return Vector3.SqrMagnitude(TargetPosition - joints[0].virtualPosition) < m_TotalLinksLength * m_TotalLinksLength;
+            return Vector3.SqrMagnitude(TargetPosition - m_Joints[0].virtualPosition) < m_TotalLinksLength * m_TotalLinksLength;
         }
 
         /// <summary>
