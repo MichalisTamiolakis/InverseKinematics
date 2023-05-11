@@ -22,6 +22,7 @@ namespace MAGES.IK
             set => transform.position = value;
         }
         public Vector3 virtualPosition;
+        public Vector3 localPosition;
         public Vector3 previousPosition;
         public Vector3 previousSolvedPosition;
 
@@ -80,6 +81,18 @@ namespace MAGES.IK
         public virtual void SolveDirectionConstraint(in Matrix4x4 referenceTransform, in Vector3 direction, out Vector3 constrainedDirection)
         {
             constrainedDirection = direction; // No constraints for free move joint
+        }
+
+        /// <summary>
+        /// Constraints the current bone's rotation based on given parent rotation
+        /// </summary>
+        /// <param name="parentRotation"></param>
+        /// <param name="changed"></param>
+        /// <returns></returns>
+        public virtual Quaternion ConstraintRotationLocal(Quaternion rotation, out bool changed)
+        {
+            changed = false;
+            return rotation;
         }
 
 #if UNITY_EDITOR

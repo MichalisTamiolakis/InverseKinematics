@@ -17,6 +17,19 @@ namespace MAGES.IK
         {
         }
 
-        
+
+        /// <summary>
+        /// Constraints the current bone's rotation based on given parent rotation
+        /// </summary>
+        /// <param name="parentRotation"></param>
+        /// <param name="changed"></param>
+        /// <returns></returns>
+        public override Quaternion ConstraintRotationLocal(Quaternion rotation, out bool changed)
+        {
+            changed = false;
+            return rotation;
+        }
+
+
     }
 }

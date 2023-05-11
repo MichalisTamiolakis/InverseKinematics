@@ -33,7 +33,6 @@ namespace MAGES.IK
             constrainedDirection = rotation * startAxis;
         }
 
-
         protected static float ModularClamp(float angle, float minAngle, float maxAngle)
         {
             //Normalize angle
@@ -45,6 +44,26 @@ namespace MAGES.IK
             //Return the clamped angle
             return angle;
         }
+
+        /// <summary>
+        /// Constraints the current bone's rotation based on given parent rotation
+        /// </summary>
+        /// <param name="rotation"></param>
+        /// <param name="changed"></param>
+        /// <returns></returns>
+        public override Quaternion ConstraintRotationLocal(Quaternion rotation, out bool changed)
+        {
+            changed = false;
+            // If limit is zero return rotation fixed to axis
+            if (minAngleDegrees == 0 && maxAngleDegrees == 0) return Quaternion.AngleAxis(0, hingeAxis);
+
+            // Get 1 degree of freedom rotation along axis
+            Quaternion free1DOF = Quaternion.FromToRotation(rotation * hingeAxis, hingeAxis) * rotation;
+
+            return free1DOF;
+
+        }
+
 
 #if UNITY_EDITOR
 

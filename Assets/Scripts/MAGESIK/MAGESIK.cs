@@ -6,6 +6,7 @@
 // - Main Paper: http://www.andreasaristidou.com/publications/papers/FABRIK.pdf
 // - Constraints: http://andreasaristidou.com/publications/papers/Extending_FABRIK_with_Model_C%CE%BFnstraints.pdf
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -14,6 +15,7 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityEngine.XR;
 
 
 namespace MAGES.IK
@@ -21,39 +23,6 @@ namespace MAGES.IK
     [AddComponentMenu("MAGES/IK/IK Solver")]
     public class MAGESIK : MonoBehaviour
     {
-        //[System.Serializable]
-        //public class Link
-        //{
-        //    public Link()
-        //    {
-        //    }
-
-        //    public Link(float length)
-        //    {
-        //        this.length = length;
-        //    }
-
-        //    public Link(float length, Vector3 initialDirection)
-        //    {
-        //        this.length = length;
-        //        this.initialDirection = initialDirection;
-        //        this.previousDirection = initialDirection;
-        //    }
-
-        //    public float length = 0f;
-
-        //    public Vector3 initialDirection = Vector3.up;
-            
-        //    /// <summary>
-        //    /// The current link direction, based on world space
-        //    /// </summary>
-        //    public Vector3 direction = Vector3.up;
-        //    public Vector3 previousDirection = Vector3.up;
-
-
-        //    public Matrix4x4 RotationMatrix => Matrix4x4.Rotate(Quaternion.FromToRotation(Vector3.up, direction));
-        //}
-
         public Transform target = null;
         public int iterations = 8;
         public float errorTolerance = .01f;
@@ -202,11 +171,26 @@ namespace MAGES.IK
         
         private void PreSolve()
         {
-            // Store current positions as previous positions
-            foreach (IKJoint j in m_Joints)
+            m_ChainLength = 0;
+            for(int i= 0; i<m_Joints.Count; i++)
             {
-                j.previousPosition = j.virtualPosition;
-                j.previousRotation = j.virtualRotation;
+                // Store current positions as previous positions
+                m_Joints[i].previousPosition = m_Joints[i].virtualPosition;
+                m_Joints[i].previousRotation = m_Joints[i].virtualRotation;
+
+                m_Joints[i].virtualPosition = m_Joints[i].Position;
+                m_Joints[i].virtualRotation = m_Joints[i].Rotation;
+
+                // Recalculate and store lengths for any change between frames
+                if (i < m_Joints.Count - 1)
+                {
+                    m_Joints[i].length = (m_Joints[i].Position - m_Joints[i + 1].Position).magnitude;
+                    m_Joints[i].axis = Quaternion.Inverse(m_Joints[i].Rotation) * (m_Joints[i + 1].Position - m_Joints[i].Position);
+
+                    m_ChainLength += m_Joints[i].length;
+                }
+                
+                m_Joints[i].localPosition = Quaternion.Inverse(GetParentVirtualRotation(i)) * (m_Joints[i].transform.position - GetParentVirtualPosition(i));
             }
         }
 
@@ -220,36 +204,55 @@ namespace MAGES.IK
                 IKJoint nextJoint = m_Joints[i + 1];
                 IKJoint joint = m_Joints[i];
 
+                joint.virtualPosition = nextJoint.virtualPosition - (nextJoint.virtualPosition - joint.virtualPosition).normalized * joint.length;
 
-                Vector3 direction = (nextJoint.virtualPosition - joint.virtualPosition).normalized;
 
-                joint.virtualPosition = nextJoint.virtualPosition - direction * joint.length;
+                ConstraintJointRotationForward(i, i + 1);
             }
+            
+            ConstraintJointRotationForward(0, 0);
         }
 
         private void SolveBackward(Vector3 targetPos)
         {
             m_Joints[0].virtualPosition = targetPos;
-            for(int i=1; i<m_Joints.Count; i++)
+
+            for (int i = 0; i < m_Joints.Count - 1; i++)
             {
-                IKJoint joint = m_Joints[i];
-                IKJoint previousJoint = m_Joints[i - 1];
+                Vector3 nextPosition = m_Joints[i].virtualPosition + (m_Joints[i + 1].virtualPosition - m_Joints[i].virtualPosition).normalized * m_Joints[i].length; 
 
-                Vector3 direction = (joint.virtualPosition - previousJoint.virtualPosition).normalized;
+                Quaternion swing = Quaternion.FromToRotation(m_Joints[i].virtualRotation * m_Joints[i].axis, nextPosition - m_Joints[i].virtualPosition);
+                Quaternion unconstrainedRotation = swing * m_Joints[i].virtualRotation;
 
-                joint.virtualPosition = previousJoint.virtualPosition + direction * previousJoint.length;
-            
+                Quaternion constrainedLocalRotation = GetJointConstrainedRotation(i, unconstrainedRotation, out _);
+                //Quaternion constrainedLocalRotation = unconstrainedRotation;
+
+
+                Quaternion fromTo = Utilities.QuaternionUtilities.RotationDifference(m_Joints[i].virtualRotation, constrainedLocalRotation);
+                m_Joints[i].virtualRotation = constrainedLocalRotation;
+                RotateChildrenJoints(i, fromTo);
+
+                m_Joints[i + 1].virtualPosition = m_Joints[i].virtualPosition + m_Joints[i].virtualRotation * m_Joints[i + 1].localPosition;
             }
+
+            // Reconstruct solver rotations to protect from invalid Quaternions
+            for (int i = 0; i < m_Joints.Count; i++)
+            {
+                m_Joints[i].virtualRotation = Quaternion.LookRotation(m_Joints[i].virtualRotation * Vector3.forward, m_Joints[i].virtualRotation * Vector3.up);
+            }
+
         }
+
 
         private void PostSolve()
         {
-            for(int i=0; i<m_Joints.Count; i++)
+            m_Joints[0].transform.position = m_Joints[0].virtualPosition;
+
+            for (int i = 0; i < m_Joints.Count-1; i++)
             {
-                m_Joints[i].ApplyVirtualPosition();
+                m_Joints[i].transform.rotation = m_Joints[i].virtualRotation;
             }
         }
-
 
         private void OnDrawGizmos()
         {
@@ -306,28 +309,170 @@ namespace MAGES.IK
             return changed;
         }
 
-        #endregion
-        public static void DrawPlaneAtPoint(in Plane plane, in Vector3 center, in float size, in Color color, in float duration, in bool depthTest = true)
+        /// <summary>
+        /// Constraint joint direction, used in Forward Reach section
+        /// </summary>
+        /// <param name="baseTransformJointIndex"></param>
+        /// <param name="jointIndex"></param>
+        private void ConstraintJointRotationForward(int baseTransformJointIndex, int jointIndex)
         {
-            Vector3 centerOnPlane = plane.ClosestPointOnPlane(center);
-            Quaternion basis = Quaternion.LookRotation(plane.normal);
-            Vector3 scale = Vector3.one * size / 10f;
+            // Store last bone's position before limiting the rotation
+            Vector3 lastBoneBeforeRotationLimit = m_Joints[m_Joints.Count - 1].virtualPosition;
 
-            Vector3 right = Vector3.Scale(basis * Vector3.right, scale);
-            Vector3 up = Vector3.Scale(basis * Vector3.up, scale);
-
-            for (int i = -5; i <= 5; i++)
+            // Rotate all bones to their new rotation
+            for (int i = baseTransformJointIndex; i < m_Joints.Count - 1; i++)
             {
-                UnityEngine.Debug.DrawLine(centerOnPlane + right * i - up * 5, centerOnPlane + right * i + up * 5, color, duration, depthTest);
-                UnityEngine.Debug.DrawLine(centerOnPlane + up * i - right * 5, centerOnPlane + up * i + right * 5, color, duration, depthTest);
+                Quaternion fromTo = Quaternion.FromToRotation(m_Joints[i].virtualRotation * m_Joints[i].axis, m_Joints[i + 1].virtualPosition - m_Joints[i].virtualPosition);
+
+                m_Joints[i].virtualRotation = fromTo * m_Joints[i].virtualRotation;
             }
 
-            UnityEngine.Debug.DrawLine(centerOnPlane, centerOnPlane + (size / 10) * plane.normal, Color.cyan, duration, depthTest);
+            // Limit bone's rotation
+            bool changed;
+            Quaternion afterLimit = GetJointConstrainedRotation(jointIndex, m_Joints[jointIndex].virtualRotation, out changed);
+
+            if (changed)
+            {
+                // Rotating and positioning the hierarchy so that the last bone's position is maintained
+                if (jointIndex < m_Joints.Count - 1)
+                {
+                    Quaternion change = Utilities.QuaternionUtilities.RotationDifference(m_Joints[jointIndex].virtualRotation, afterLimit);
+                    m_Joints[jointIndex].virtualRotation = afterLimit;
+
+
+                    // Rotate all links around the joint 
+                    RotateChildrenJoints(jointIndex, change); // First rotate directions
+                    MoveChildrenAroundJoint(jointIndex, change); // Move positions 
+
+                    // Rotating to compensate for the limit
+                    Quaternion fromTo = Quaternion.FromToRotation(m_Joints[m_Joints.Count - 1].virtualPosition - m_Joints[baseTransformJointIndex].virtualPosition, lastBoneBeforeRotationLimit - m_Joints[baseTransformJointIndex].virtualPosition);
+
+                    RotateJoint(baseTransformJointIndex, fromTo);
+                    RotateChildrenJoints(baseTransformJointIndex, fromTo);
+                    MoveChildrenAroundJoint(baseTransformJointIndex, fromTo);
+
+                    // Moving the bone so that last bone maintains it's initial position
+                    MoveJoint(baseTransformJointIndex, lastBoneBeforeRotationLimit - m_Joints[m_Joints.Count - 1].virtualPosition);
+                    MoveChildrenJoints(baseTransformJointIndex, lastBoneBeforeRotationLimit - m_Joints[m_Joints.Count - 1].virtualPosition);
+
+                }
+                else
+                {
+                    // last bone
+                    m_Joints[jointIndex].virtualRotation = afterLimit;
+                }
+            }
         }
 
+        /// <summary>
+        /// Get the constrained rotation of a joint (based on joint type), given an unconstrained one
+        /// </summary>
+        /// <param name="jointIndex"></param>
+        /// <param name="unconstrainedRotation"></param>
+        /// <param name="changed"></param>
+        /// <returns></returns>
+        private Quaternion GetJointConstrainedRotation(int jointIndex, Quaternion unconstrainedRotation, out bool changed)
+        {
+            changed = false;
+
+            Quaternion parentRotation = GetParentVirtualRotation(jointIndex);
+
+            // Convert actual rotation to local rotation space
+            Quaternion localSpaceUnconstrainedRotation = Quaternion.Inverse(parentRotation) * unconstrainedRotation;
+
+            Quaternion localSpaceConstrainedRotation = m_Joints[jointIndex].ConstraintRotationLocal(localSpaceUnconstrainedRotation, out changed);
+
+            return parentRotation * localSpaceConstrainedRotation;
+
+        }
+
+        /// <summary>
+        /// Get the parent joint solver rotation
+        /// </summary>
+        /// <param name="jointIndex"></param>
+        /// <returns></returns>
+        private Quaternion GetParentVirtualRotation(int jointIndex)
+        {
+            if (jointIndex > 0) return m_Joints[jointIndex - 1].virtualRotation;
+            if (m_Joints[0].transform.parent == null) return Quaternion.identity;
+            return m_Joints[0].transform.parent.rotation;
+        }
+
+        /// <summary>
+        /// Get the parent joint solver position
+        /// </summary>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        private Vector3 GetParentVirtualPosition(int index)
+        {
+            if (index > 0) return m_Joints[index - 1].virtualPosition;
+            if (m_Joints[0].transform.parent == null) return Vector3.zero;
+            return m_Joints[0].transform.parent.position;
+        }
+
+        /// <summary>
+        /// Rotate given joint by rotation
+        /// </summary>
+        /// <param name="jointIndex"></param>
+        /// <param name="rotation"></param>
+        private void RotateJoint(int jointIndex, Quaternion rotation)
+        {
+            m_Joints[jointIndex].virtualRotation = rotation * m_Joints[jointIndex].virtualRotation;
+        }
+
+        /// <summary>
+        /// Rotates children joints by given rotation
+        /// </summary>
+        /// <param name="jointIndex"></param>
+        /// <param name="rotation"></param>
+        private void RotateChildrenJoints(int jointIndex, Quaternion rotation)
+        {
+            for(int i=jointIndex +1; i<m_Joints.Count; i++)
+            {
+                m_Joints[i].virtualRotation = rotation * m_Joints[i].virtualRotation;
+            }
+        }
+
+        /// <summary>
+        /// Moves children positions around a joint, by given rotation
+        /// </summary>
+        /// <param name="jointIndex"></param>
+        /// <param name="rotation"></param>
+        private void MoveChildrenAroundJoint(int jointIndex, Quaternion rotation)
+        {
+            for (int i = jointIndex + 1; i < m_Joints.Count; i++)
+            {
+                Vector3 dir = m_Joints[i].virtualPosition - m_Joints[jointIndex].virtualPosition;
+                m_Joints[i].virtualPosition = m_Joints[jointIndex].virtualPosition + rotation * dir;
+            }
+        }
+
+        /// <summary>
+        /// Moves joint by given offset
+        /// </summary>
+        /// <param name="jointIndex"></param>
+        /// <param name="offset"></param>
+        private void MoveJoint(int jointIndex, Vector3 offset)
+        {
+            m_Joints[jointIndex].virtualPosition += offset;
+        }
+
+        /// <summary>
+        /// Moves children joint positions by given offset
+        /// </summary>
+        /// <param name="jointIndex"></param>
+        /// <param name="offset"></param>
+        private void MoveChildrenJoints(int jointIndex, Vector3 offset)
+        {
+            for(int i = jointIndex+1; i<m_Joints.Count; i++)
+            {
+                MoveJoint(i, offset);
+            }
+        }
+        #endregion
 
         #region Editor
 
-#endregion
+        #endregion
     }
 }
