@@ -33,6 +33,11 @@ namespace MAGES.IK
         public Quaternion virtualRotation;
         public Quaternion previousRotation;
 
+        // Link to parent properties
+        public Vector3 axis = Vector3.up; // Link to parent axis in local space
+        public float length = 0;
+        public float sqrLength = 0;
+
         public IKJoint ParentJoint
         {
 

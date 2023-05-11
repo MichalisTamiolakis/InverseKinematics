@@ -21,38 +21,38 @@ namespace MAGES.IK
     [AddComponentMenu("MAGES/IK/IK Solver")]
     public class MAGESIK : MonoBehaviour
     {
-        [System.Serializable]
-        public class Link
-        {
-            public Link()
-            {
-            }
+        //[System.Serializable]
+        //public class Link
+        //{
+        //    public Link()
+        //    {
+        //    }
 
-            public Link(float length)
-            {
-                this.length = length;
-            }
+        //    public Link(float length)
+        //    {
+        //        this.length = length;
+        //    }
 
-            public Link(float length, Vector3 initialDirection)
-            {
-                this.length = length;
-                this.initialDirection = initialDirection;
-                this.previousDirection = initialDirection;
-            }
+        //    public Link(float length, Vector3 initialDirection)
+        //    {
+        //        this.length = length;
+        //        this.initialDirection = initialDirection;
+        //        this.previousDirection = initialDirection;
+        //    }
 
-            public float length = 0f;
+        //    public float length = 0f;
 
-            public Vector3 initialDirection = Vector3.up;
+        //    public Vector3 initialDirection = Vector3.up;
             
-            /// <summary>
-            /// The current link direction, based on world space
-            /// </summary>
-            public Vector3 direction = Vector3.up;
-            public Vector3 previousDirection = Vector3.up;
+        //    /// <summary>
+        //    /// The current link direction, based on world space
+        //    /// </summary>
+        //    public Vector3 direction = Vector3.up;
+        //    public Vector3 previousDirection = Vector3.up;
 
 
-            public Matrix4x4 RotationMatrix => Matrix4x4.Rotate(Quaternion.FromToRotation(Vector3.up, direction));
-        }
+        //    public Matrix4x4 RotationMatrix => Matrix4x4.Rotate(Quaternion.FromToRotation(Vector3.up, direction));
+        //}
 
         public Transform target = null;
         public int iterations = 8;
@@ -68,9 +68,9 @@ namespace MAGES.IK
 
 
         // IK links & joints
-        public List<Link> links = new List<Link>();
+        //public List<Link> links = new List<Link>();
         [SerializeField]
-        private float m_TotalLinksLength;
+        private float m_ChainLength = 0;
         [SerializeField]
         private List<IKJoint> m_Joints = new List<IKJoint>();
 
@@ -127,9 +127,13 @@ namespace MAGES.IK
 
         public void InitializeJoints()
         {
+            m_ChainLength = 0;
             // Initialize Joints
-            foreach (IKJoint joint in m_Joints)
+            int i = 0;
+            for (i= 0; i < m_Joints.Count-1; i++)
             {
+                IKJoint joint = m_Joints[i];
+                IKJoint nextJoint = m_Joints[i + 1];
                 if (joint == null)
                     return;
 
@@ -143,23 +147,25 @@ namespace MAGES.IK
                 joint.previousSolvedPosition = joint.initialPosition;
 
                 joint.solver = this;
+
+                joint.sqrLength = Vector3.SqrMagnitude(nextJoint.Position - joint.Position);
+                joint.length = Mathf.Sqrt(joint.sqrLength);
+                joint.axis = Quaternion.Inverse(joint.Rotation) * (nextJoint.Position - joint.Position);
+
+                m_ChainLength += joint.length;
             }
 
-        }
+            m_Joints[i].virtualPosition = m_Joints[i].Position;
+            m_Joints[i].initialPosition = m_Joints[i].virtualPosition;
+            m_Joints[i].virtualRotation = m_Joints[i].Rotation;
+            m_Joints[i].initialRotation = m_Joints[i].virtualRotation;
 
-        public void InitializeLinks()
-        {
-            // Initialize Links
-            links.Clear();
-            m_TotalLinksLength = 0f;
-            for (int i = 1; i < m_Joints.Count; i++)
-            {
-                float length = (m_Joints[i].virtualPosition - m_Joints[i - 1].virtualPosition).magnitude;
-                Vector3 direction = (m_Joints[i].virtualPosition - m_Joints[i - 1].virtualPosition).normalized;
+            m_Joints[i].previousRotation = m_Joints[i].initialRotation;
+            m_Joints[i].previousPosition = m_Joints[i].initialPosition;
+            m_Joints[i].previousSolvedPosition = m_Joints[i].initialPosition;
+            m_Joints[i].solver = this;
+            m_Joints[i].axis = Quaternion.Inverse(m_Joints[i].Rotation) * (m_Joints[i].Position - m_Joints[0].Position);
 
-                links.Add(new Link(length, direction));
-                m_TotalLinksLength += length;
-            }
         }
 
         [ContextMenu("Solve IK")]
@@ -195,12 +201,6 @@ namespace MAGES.IK
                 j.previousPosition = j.virtualPosition;
                 j.previousRotation = j.virtualRotation;
             }
-
-            // Store current directions as previous directions
-            foreach (Link l in links)
-            {
-                l.previousDirection = l.direction;
-            }
         }
 
         private void SolveForward()
@@ -214,12 +214,10 @@ namespace MAGES.IK
                 // Root ... ----| previousLink |----> (parentJoint) ----| currentLink |---->  (currentJoint) ----| ... | ---->  ... Leaf
                 IKJoint currentJoint = m_Joints[i];
                 IKJoint parentJoint = m_Joints[i - 1];
-                Link currentLink = links[i - 1];
 
                 // Intermediate joint
                 if (i > 1)
                 {
-                    Link previousLink = links[i - 2];
 
                     Vector3 direction = currentJoint.virtualPosition - parentJoint.virtualPosition;
 
@@ -349,7 +347,7 @@ namespace MAGES.IK
         /// <returns>Is the target in reach?</returns>
         private bool IsTargetInReach()
         {
-            return Vector3.SqrMagnitude(TargetPosition - m_Joints[0].virtualPosition) < m_TotalLinksLength * m_TotalLinksLength;
+            return Vector3.SqrMagnitude(TargetPosition - m_Joints[0].virtualPosition) < m_ChainLength * m_ChainLength;
         }
 
         /// <summary>
