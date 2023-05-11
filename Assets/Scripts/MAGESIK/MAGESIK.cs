@@ -250,8 +250,10 @@ namespace MAGES.IK
 
             for (int i = 0; i < m_Joints.Count-1; i++)
             {
-                m_Joints[i].transform.rotation = m_Joints[i].virtualRotation;
+                m_Joints[i].ApplyVirtualPosition();
+                m_Joints[i].ApplyVirtualRotation();
             }
+            m_Joints[m_Joints.Count - 1].ApplyVirtualPosition();
         }
 
         private void OnDrawGizmos()
