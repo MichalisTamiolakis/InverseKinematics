@@ -24,9 +24,8 @@ namespace MAGES.IK
         /// <param name="parentRotation"></param>
         /// <param name="changed"></param>
         /// <returns></returns>
-        public override Quaternion ConstraintRotationLocal(Quaternion rotation, out bool changed)
+        public override Quaternion ConstraintRotationLocal(Quaternion rotation)
         {
-            changed = false;
             return rotation;
         }
 

@@ -51,9 +51,8 @@ namespace MAGES.IK
         /// <param name="rotation"></param>
         /// <param name="changed"></param>
         /// <returns></returns>
-        public override Quaternion ConstraintRotationLocal(Quaternion rotation, out bool changed)
+        public override Quaternion ConstraintRotationLocal(Quaternion rotation)
         {
-            changed = false;
             // If limit is zero return rotation fixed to axis
             if (minAngleDegrees == 0 && maxAngleDegrees == 0) return Quaternion.AngleAxis(0, hingeAxis);
 

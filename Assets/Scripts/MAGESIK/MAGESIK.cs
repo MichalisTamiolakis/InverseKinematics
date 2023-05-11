@@ -24,7 +24,7 @@ namespace MAGES.IK
     public class MAGESIK : MonoBehaviour
     {
         public Transform target = null;
-        public int iterations = 8;
+        public int iterations = 6;
         public float errorTolerance = .01f;
 
 
@@ -375,14 +375,14 @@ namespace MAGES.IK
         /// <returns></returns>
         private Quaternion GetJointConstrainedRotation(int jointIndex, Quaternion unconstrainedRotation, out bool changed)
         {
-            changed = false;
-
             Quaternion parentRotation = GetParentVirtualRotation(jointIndex);
 
             // Convert actual rotation to local rotation space
             Quaternion localSpaceUnconstrainedRotation = Quaternion.Inverse(parentRotation) * unconstrainedRotation;
 
-            Quaternion localSpaceConstrainedRotation = m_Joints[jointIndex].ConstraintRotationLocal(localSpaceUnconstrainedRotation, out changed);
+            Quaternion localSpaceConstrainedRotation = m_Joints[jointIndex].ConstraintRotationLocal(localSpaceUnconstrainedRotation);
+
+            changed = localSpaceConstrainedRotation != localSpaceUnconstrainedRotation;
 
             return parentRotation * localSpaceConstrainedRotation;
 

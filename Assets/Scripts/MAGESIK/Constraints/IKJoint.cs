@@ -86,12 +86,11 @@ namespace MAGES.IK
         /// <summary>
         /// Constraints the current bone's rotation based on given parent rotation
         /// </summary>
-        /// <param name="parentRotation"></param>
-        /// <param name="changed"></param>
+        /// <param name="rotation">The rotation to be constrained. In Local Joint "rotation space"</param>
+        /// <param name="changed">If change to the rotation happens</param>
         /// <returns></returns>
-        public virtual Quaternion ConstraintRotationLocal(Quaternion rotation, out bool changed)
+        public virtual Quaternion ConstraintRotationLocal(Quaternion rotation)
         {
-            changed = false;
             return rotation;
         }
 
