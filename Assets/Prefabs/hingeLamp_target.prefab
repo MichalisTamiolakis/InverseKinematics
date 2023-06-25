@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4874906956835593970}
   - component: {fileID: 4874906956835593965}
   - component: {fileID: 4874906956835593964}
+  - component: {fileID: 1746157009}
   m_Layer: 0
   m_Name: hingeLamp_target
   m_TagString: Untagged
@@ -27,8 +28,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4874906956835593967}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.31237507, y: 0.99, z: -2.91}
-  m_LocalScale: {x: 0.31588992, y: 0.31588992, z: 0.31588992}
+  m_LocalPosition: {x: -5.394, y: 1.8627, z: -6.2573}
+  m_LocalScale: {x: 0.10648333, y: 0.10648333, z: 0.10648333}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -97,3 +98,23 @@ SphereCollider:
   serializedVersion: 2
   m_Radius: 0.5
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!95 &1746157009
+Animator:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4874906956835593967}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: abf5b46c550459d46a86ec08763d0ba8, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorControllerStateOnDisable: 0
