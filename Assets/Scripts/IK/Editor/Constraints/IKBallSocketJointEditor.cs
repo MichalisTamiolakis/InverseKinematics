@@ -1,6 +1,6 @@
 ﻿using UnityEditor;
 
-namespace MAGES.IK
+namespace IK
 {
     internal class IKBallSocketJointEditor: IKJointEditor
     {

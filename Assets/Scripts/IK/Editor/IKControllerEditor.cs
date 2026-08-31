@@ -2,10 +2,10 @@ using UnityEditor;
 using UnityEditor.EditorTools;
 using UnityEngine;
 
-namespace MAGES.IK
+namespace IK
 {
-    [CustomEditor(typeof(MAGESIK))]
-    public class MAGESIKEditor : Editor
+    [CustomEditor(typeof(IKController))]
+    public class IKControllerEditor : Editor
     {
         protected static class Styles
         {
@@ -22,7 +22,7 @@ namespace MAGES.IK
 
         public override void OnInspectorGUI()
         {
-            MAGESIK ik = (MAGESIK)target;
+            IKController ik = (IKController)target;
 
             bool isEditToolActive = ToolManager.activeToolType == typeof(IKConstraintsEditTool);
 
@@ -108,10 +108,10 @@ namespace MAGES.IK
     }
 
 
-    [EditorTool("Angular Limits Edit Tool", typeof(MAGESIK))]
+    [EditorTool("Angular Limits Edit Tool", typeof(IKController))]
     public class IKConstraintsEditTool : EditorTool
     {
-        private MAGESIK m_IK;
+        private IKController m_IK;
 
         protected static class Styles
         {
@@ -131,12 +131,12 @@ namespace MAGES.IK
 
         private void OnEnable()
         {
-            m_IK = (MAGESIK)target;
+            m_IK = (IKController)target;
         }
 
         public override void OnToolGUI(EditorWindow window)
         {
-            m_IK = (MAGESIK)target;
+            m_IK = (IKController)target;
 
             if (m_IK.Joints.Count < 2)
                 return;

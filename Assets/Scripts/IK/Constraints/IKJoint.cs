@@ -3,15 +3,15 @@ using UnityEngine;
 
 
 
-namespace MAGES.IK
+namespace IK
 {
-    [AddComponentMenu("MAGES/IK/Unconstrained Joint")]
+    [AddComponentMenu("IK/Unconstrained Joint")]
     public class IKJoint : MonoBehaviour
     {
-        public MAGESIK solver;
+        public IKController solver;
 
 
-        // ---- These variables are set by the MAGESIK script on which thris joint isattached to ----
+        // ---- These variables are set by the IKController script on which thris joint isattached to ----
         // Length from this to next joint transform
         public Quaternion initialRotation;
         public Vector3 initialPosition;

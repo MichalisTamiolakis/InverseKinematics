@@ -2,9 +2,9 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 
-namespace MAGES.IK
+namespace IK
 {
-    [AddComponentMenu("MAGES/IK/Hinge Joint")]
+    [AddComponentMenu("IK/Hinge Joint")]
     public class IKHingeJoint : IKJoint
     {
         public float minAngleDegrees = -90f;

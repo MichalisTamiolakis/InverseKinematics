@@ -1,6 +1,6 @@
 ﻿using UnityEditor;
 
-namespace MAGES.IK
+namespace IK
 {
     [CustomEditor(typeof(IKHingeJoint))]
     internal class IKHingeJointEditor: IKJointEditor

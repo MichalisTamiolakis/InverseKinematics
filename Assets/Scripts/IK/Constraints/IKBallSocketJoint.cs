@@ -1,8 +1,8 @@
 using UnityEngine;
 
-namespace MAGES.IK
+namespace IK
 {
-    [AddComponentMenu("MAGES/IK/BallSocket Joint")]
+    [AddComponentMenu("IK/BallSocket Joint")]
     public class IKBallSocketJoint : IKJoint
     {
         public Vector2 minAngleDegrees = new Vector2(-90f, -90f);

@@ -8,7 +8,7 @@ using UnityEditor;
 using UnityEditor.EditorTools;
 using UnityEngine;
 
-namespace MAGES.IK
+namespace IK
 {
     [CustomEditor(typeof(IKJoint))]
     internal class IKJointEditor: Editor

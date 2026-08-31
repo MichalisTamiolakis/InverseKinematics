@@ -18,10 +18,10 @@ using UnityEngine.UIElements;
 using UnityEngine.XR;
 
 
-namespace MAGES.IK
+namespace IK
 {
-    [AddComponentMenu("MAGES/IK/IK Solver")]
-    public class MAGESIK : MonoBehaviour
+    [AddComponentMenu("IK/IK Solver")]
+    public class IKController : MonoBehaviour
     {
         public Transform target = null;
         public int iterations = 6;
